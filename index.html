@@ -148,42 +148,11 @@
 		'g': '#a0c35a'
 	}
 
-	d3.csv(`./data/connections-tracker.csv`).then(function (data) {
-		layers = [];
-		for (const row of data) {
-			const geo = buildRows(row);
-			layers.push({
-				...row,
-				data: geo
-			});
-		}
-		return layers;
-	}).then((layers) => {
-		uniqueLayers = getUniqueByKey(layers, 'date');
-		rows = uniqueLayers.length;
-		for (const [index, value] of uniqueLayers.entries()) {
-			const newDiv = document.createElement('div');
-			newDiv.classList.add('step');
-			newDiv.setAttribute('id', index);
-			const parent = document.getElementById('steps');
-			parent.appendChild(newDiv);
-			addLayers(index, value, layers)
-		}
-	}).then(() => {
-		
-		initScroller();
-		addClick();
-
-	}).catch(function (error) {
-		// Handle any errors that occur during loading
-		console.error("Error loading the CSV file:", error);
-	});
-
     const map = new maplibregl.Map({
         container: 'map', // container id
         style, // style URL
         center: [0, 0.2], // starting position [lng, lat]
-        zoom: 8.5, // starting zoom
+        zoom: width < 600? 8 : 9, // starting zoom
         maplibreLogo: false,
 		bearing: 50,
 		pitch: 40
@@ -191,6 +160,34 @@
 
 	map.on('load', () => {
 		loaded = true;
+		d3.csv(`./data/connections-tracker.csv`).then(function (data) {
+			layers = [];
+			for (const row of data) {
+				const geo = buildRows(row);
+				layers.push({
+					...row,
+					data: geo
+				});
+			}
+			return layers;
+		}).then((layers) => {
+			uniqueLayers = getUniqueByKey(layers, 'date');
+			rows = uniqueLayers.length;
+			for (const [index, value] of uniqueLayers.entries()) {
+				const newDiv = document.createElement('div');
+				newDiv.classList.add('step');
+				newDiv.setAttribute('id', index);
+				const parent = document.getElementById('steps');
+				parent.appendChild(newDiv);
+				addLayers(index, value, layers)
+			}
+		}).then(() => {
+			initScroller();
+			addClick();
+		}).catch(function (error) {
+			// Handle any errors that occur during loading
+			console.error("Error loading the CSV file:", error);
+		});
 	});
 
 	function buildRows(row) {
