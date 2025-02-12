@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Display a map</title>
+    <meta property="og:description" content="Initialize a map in an HTML element with MapLibre GL JS." />
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.css' />
+    <script src='https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js'></script>
+	<script src="https://unpkg.com/d3@7.9.0/dist/d3.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/@turf/turf@7/turf.min.js"></script>
+	<script src="https://unpkg.com/scrollama"></script>
+    <style>
+        body { margin: 0; padding: 0; }
+        html, body { height: 100%; }
+		#map {
+			pointer-events: none;
+			position:fixed;
+			width:100%;
+			height:100vh;
+			top:0;
+		}
+
+		#steps {
+			position: absolute;
+			z-index: 11;
+			margin: auto;
+			width:100%;
+			/* overflow: hidden; */
+		}
+
+		.step {
+			height:100vh;
+			width:100%;
+		}
+
+		#popup {
+			position: absolute;
+			top:0;
+			left:0;
+			width:250px;
+			background-color: rgba(255,255,255,0.85);
+		}
+    </style>
+</head>
+<body>
+<div id="popup"></div>
+<div id="steps"></div>
+<div id="map"></div>
+<script>
+
+	window.onbeforeunload = function () {
+		window.scrollTo(0, 0);
+	}
+	let active = false;
+	let layers;
+	let loaded = false;
+	let latestDate;
+	let latestRow = 0;
+	let latestColumn = 0;
+	let latestIndex = 0;
+	let rows = 0;
+	const dist = 0.1;
+	const height = 10000;
+
+    const style = {
+        version: 8,
+		lighting: {
+			intensity: 0
+			// position: [1, -90, -30]
+		},
+        sources: {},
+        layers: [
+            {
+                id: 'background',
+                type: 'background',
+                paint: {
+                    'background-color': '#fff'
+                }
+            }
+        ]
+    }
+
+	d3.csv(`./data/connections-tracker.csv`).then(function (data) {
+		layers = [];
+		for (const row of data) {
+			const geo = buildRows(row);
+			layers.push({
+				...row,
+				data: geo
+			});
+		}
+		return layers;
+	}).then((layers) => {
+		const uniqueArr = getUniqueByKey(layers, 'date');
+		// console.log(uniqueArr);
+		rows = uniqueArr.length;
+		for (const [index, value] of uniqueArr.entries()) {
+			const newDiv = document.createElement('div');
+			newDiv.classList.add('step');
+			newDiv.setAttribute('id', index);
+			newDiv.textContent = `${value.answer}`;
+			const parent = document.getElementById('steps');
+			parent.appendChild(newDiv);
+			addLayers(index, value, layers)
+		}
+	}).then(() => {
+		console.log('adding scroll');
+		// instantiate the scrollama
+		const scroller = scrollama();
+
+		// setup the instance, pass callback functions
+		scroller
+			.setup({
+				step: ".step",
+			})
+			.onStepEnter((response) => {
+				// console.log('index enter', response);
+
+				if (loaded) {
+					// if (response.index % 4 === 0) {
+						latestIndex = response.index;
+						map.easeTo({
+							center: [(response.index*dist), 0.2]
+						});
+						const base = response.index;
+						map.setPaintProperty(`${base}-layer`, 'fill-extrusion-opacity', 0.85);
+
+						// console.log('layers', layers[response.index]);
+						map.setLayoutProperty(`${base}-layer`, 'visibility', 'visible');
+						const arr = Array.from(Array(rows).keys());
+						arr.forEach((i) => {
+							if (i != latestIndex && latestIndex > i) {
+								map.setLayoutProperty(`${i}-layer`, 'visibility', 'none');
+							}
+						})
+						// rows.forEach((r, i) => {
+						// 	console.log('r', r);
+						// 	console.log('i', i);
+						// })
+						// map.setPaintProperty(`${base+2}-layer`, 'fill-extrusion-opacity', 0.85);
+						// map.setPaintProperty(`${base+3}-layer`, 'fill-extrusion-opacity', 0.85);
+						// map.setPaintProperty(`${base+4}-layer`, 'fill-extrusion-opacity', 0.85);
+					// }
+					
+				}
+				// { element, index, direction }
+			})
+			.onStepExit((response) => {
+				// console.log('index exit', response);
+				const base = response.index;
+				map.setPaintProperty(`${base}-layer`, 'fill-extrusion-opacity', 0.1);
+				if (latestIndex > response.index) {
+					// map.setLayoutProperty(`${base}-layer`, 'visibility', 'none');
+				}
+				
+				// { element, index, direction }
+			});
+		
+		// map.on('click', () => {
+			
+		// })
+
+		document.getElementById('steps').addEventListener('click', function (event) {
+			active = !active;
+			console.log('active', active);
+			const vis = active ? 'visibile' : 'none';
+			// This function will be executed when the div is clicked
+			console.log('Div clicked!', event);
+			// const arr = Array.from(Array(rows).keys());
+			// arr.forEach((i) => {
+			// 	// console.log('i', i);
+			// 	if (i != latestIndex && latestIndex > i) {
+			// 		map.setLayoutProperty(`${i}-layer`, 'visibility', vis);
+			// 	}
+			// })
+
+			if (active) {
+				map.easeTo({
+					zoom: 9,
+					center: [((latestIndex * dist)+(dist*6)), 0.3],
+					bearing:90,
+					pitch:90
+				});
+			} else {
+				map.easeTo({
+					zoom: 8.5,
+					center: [(latestIndex * dist), 0.2],
+					bearing: 50,
+					pitch: 40
+				});
+			}
+			// Additional actions can be performed here
+		});
+
+	}).catch(function (error) {
+		// Handle any errors that occur during loading
+		console.error("Error loading the CSV file:", error);
+	});
+
+    const map = new maplibregl.Map({
+        container: 'map', // container id
+        style, // style URL
+        center: [0, 0.2], // starting position [lng, lat]
+        zoom: 8.5, // starting zoom
+        maplibreLogo: false,
+		bearing: 50,
+		pitch: 40
+    });
+
+	map.on('load', () => {
+		loaded = true;
+	});
+
+	function buildRows(row) {
+		if (latestDate != row.date) {
+			latestDate = row.date;
+			latestRow=latestRow+dist;
+		}
+		const layer = buildColumns(row);
+		return layer;
+	}
+
+	function buildColumns(row) {
+		const collection = turf.featureCollection([]);
+		const colorParse = row.color.split(",");
+		[1, 2, 3, 4].forEach((c) => {
+			const box = [
+				latestRow - (dist / 2),
+				(c*dist) - (dist / 2),
+				latestRow + (dist / 2),
+				(c*dist) + (dist / 2),
+			];
+			const poly = turf.bboxPolygon(box, {
+				properties: {
+					guess: row.guess,
+					color: colorParse[c-1]
+				}
+			});
+			collection.features.push(poly);
+		});
+		return collection
+	}
+
+	function addLayers(index, value, layer) {
+		// const colorParse = layer.color.split(",");
+		// const wordsParse = layer.words.split(",");
+
+
+		// console.log('index', index);
+		// console.log('value', value);
+		// console.log('layer', layer);
+
+		const output = layer.filter((l) => {return l.date === value.date});
+
+		console.log('output arrays', output);
+
+		const collection = turf.featureCollection([]);
+		[...output].forEach((feature) => {
+			// console.log('feature', feature);
+			collection.features.push(...feature.data.features);
+		})
+		
+		// console.log('object', collection);
+
+		const sourceName = `${index}-source`;
+		const layerName = `${index}-layer`;
+		map.addSource(sourceName, {
+			'type': 'geojson',
+			data: collection
+		});
+
+		map.addLayer({
+			'id': `${layerName}-line`,
+			'type': 'line',
+			'source': sourceName,
+			'filter': ['==', ['get', 'guess'], "1"],
+			'paint': {
+				// See the MapLibre Style Specification for details on data expressions.
+				// https://maplibre.org/maplibre-style-spec/expressions/
+
+				// Get the fill-extrusion-color from the source 'color' property.
+				'line-color': '#555',
+
+				// Get fill-extrusion-height from the source 'height' property.
+				'line-width': 1,
+				'line-opacity': 0.08
+			}
+		});
+
+		map.addLayer({
+			'id': layerName,
+			'type': 'fill-extrusion',
+			'source': sourceName,
+			'paint': {
+				// See the MapLibre Style Specification for details on data expressions.
+				// https://maplibre.org/maplibre-style-spec/expressions/
+
+				// Get the fill-extrusion-color from the source 'color' property.
+				'fill-extrusion-color': [
+					'match',
+					['get', 'color'],
+					'b',
+					'#b0c4ef',
+					'p',
+					'#ba81c5',
+					'y',
+					'#f9df6d',
+					'g',
+					'#a0c35a',
+					'#d3d3d3'
+				],
+
+				// Get fill-extrusion-height from the source 'height' property.
+				'fill-extrusion-height': ['*', ['to-number', ['get', 'guess']], height],
+
+				// Get fill-extrusion-base from the source 'base_height' property.
+				'fill-extrusion-base': ['-', ['*', ['to-number', ['get', 'guess']], height], height],
+
+				// Make extrusions slightly opaque for see through indoor walls.
+				'fill-extrusion-opacity': 0.1,
+
+				'fill-extrusion-opacity-transition': {
+					delay: 0,
+					duration: 500
+				}
+			}
+		});
+	}
+
+	function getUniqueByKey(array, key) {
+		const seen = new Set();
+		return array.filter(item => {
+			const value = item[key];
+			if (seen.has(value)) {
+				return false;
+			}
+			seen.add(value);
+			return true;
+		});
+	}
+
+</script>
+</body>
+</html>
