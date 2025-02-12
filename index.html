@@ -12,7 +12,7 @@
 	<script src="https://unpkg.com/scrollama"></script>
     <style>
         body { margin: 0; padding: 0; }
-        html, body { height: 100%; }
+        html, body { height: 100%; font-size:16px; color: #111}
 		#map {
 			pointer-events: none;
 			position:fixed;
@@ -30,21 +30,68 @@
 		}
 
 		.step {
-			height:100vh;
+			height:70vh;
 			width:100%;
 		}
 
+		#date {
+			font-weight: bold;
+		}
+
 		#popup {
-			position: absolute;
-			top:0;
+			position: fixed;
+			padding:20px;
+			bottom:0;
 			left:0;
-			width:250px;
-			background-color: rgba(255,255,255,0.85);
+			width:100%;
+			z-index:12;
+			background-color: rgba(255,255,255,0);
+			font-family: sans-serif;
+			text-align:center;
+			margin:auto;
+			pointer-events: none;
+			display: flex;
+    		flex-direction: column;
+		}
+
+		#popup-content {
+			text-align: center;
+    		margin: auto;
+			transition: 0.5s all;
+			width:100%;
+			display: flex;
+			flex-direction: column;
+			align-content: center;
+			justify-content: center;
+			align-items: center;
+		}
+
+		#popup-content.fade {
+			opacity:0.5;
+		}
+
+		.circles {
+			height:12px;
+			width:12px;
+			display: inline-block;
+		}
+
+		.guesses {
+			text-align: left;
+		}
+
+		.words {
+			width:fit-content;
+			display: inline-block;
 		}
     </style>
 </head>
 <body>
-<div id="popup"></div>
+<div id="popup">
+	<div id="date"></div>
+	<div id="popup-content">
+	</div>
+</div>
 <div id="steps"></div>
 <div id="map"></div>
 <script>
@@ -54,6 +101,7 @@
 	}
 	let active = false;
 	let layers;
+	let uniqueLayers;
 	let loaded = false;
 	let latestDate;
 	let latestRow = 0;
@@ -67,7 +115,6 @@
         version: 8,
 		lighting: {
 			intensity: 0
-			// position: [1, -90, -30]
 		},
         sources: {},
         layers: [
@@ -81,6 +128,13 @@
         ]
     }
 
+	const colors = {
+		'b':'#b0c4ef',
+		'p': '#ba81c5',
+		'y': '#f9df6d',
+		'g': '#a0c35a'
+	}
+
 	d3.csv(`./data/connections-tracker.csv`).then(function (data) {
 		layers = [];
 		for (const row of data) {
@@ -92,20 +146,17 @@
 		}
 		return layers;
 	}).then((layers) => {
-		const uniqueArr = getUniqueByKey(layers, 'date');
-		// console.log(uniqueArr);
-		rows = uniqueArr.length;
-		for (const [index, value] of uniqueArr.entries()) {
+		uniqueLayers = getUniqueByKey(layers, 'date');
+		rows = uniqueLayers.length;
+		for (const [index, value] of uniqueLayers.entries()) {
 			const newDiv = document.createElement('div');
 			newDiv.classList.add('step');
 			newDiv.setAttribute('id', index);
-			newDiv.textContent = `${value.answer}`;
 			const parent = document.getElementById('steps');
 			parent.appendChild(newDiv);
 			addLayers(index, value, layers)
 		}
 	}).then(() => {
-		console.log('adding scroll');
 		// instantiate the scrollama
 		const scroller = scrollama();
 
@@ -115,73 +166,68 @@
 				step: ".step",
 			})
 			.onStepEnter((response) => {
-				// console.log('index enter', response);
-
+				active = false;
 				if (loaded) {
-					// if (response.index % 4 === 0) {
-						latestIndex = response.index;
-						map.easeTo({
-							center: [(response.index*dist), 0.2]
-						});
-						const base = response.index;
-						map.setPaintProperty(`${base}-layer`, 'fill-extrusion-opacity', 0.85);
+					latestIndex = response.index;
+					map.easeTo({
+						zoom: 8.5,
+						center: [(latestIndex * dist), 0.2],
+						bearing: 50,
+						pitch: 40
+					});
+					const base = response.index;
+					map.setPaintProperty(`${base}-layer`, 'fill-extrusion-opacity', 0.85);
 
-						// console.log('layers', layers[response.index]);
-						map.setLayoutProperty(`${base}-layer`, 'visibility', 'visible');
-						const arr = Array.from(Array(rows).keys());
-						arr.forEach((i) => {
-							if (i != latestIndex && latestIndex > i) {
-								map.setLayoutProperty(`${i}-layer`, 'visibility', 'none');
-							}
-						})
-						// rows.forEach((r, i) => {
-						// 	console.log('r', r);
-						// 	console.log('i', i);
-						// })
-						// map.setPaintProperty(`${base+2}-layer`, 'fill-extrusion-opacity', 0.85);
-						// map.setPaintProperty(`${base+3}-layer`, 'fill-extrusion-opacity', 0.85);
-						// map.setPaintProperty(`${base+4}-layer`, 'fill-extrusion-opacity', 0.85);
-					// }
-					
+					// console.log('layers', layers[response.index]);
+					map.setLayoutProperty(`${base}-layer`, 'visibility', 'visible');
+					const arr = Array.from(Array(rows).keys());
+					arr.forEach((i) => {
+						if (i != latestIndex && latestIndex > i) {
+							map.setLayoutProperty(`${i}-layer`, 'visibility', 'none');
+						}
+					})
+
+					const filtered = layers.filter((l) => { return l.date === uniqueLayers[latestIndex].date });
+					document.getElementById('popup-content').innerHTML = ``;
+					filtered.forEach((f) => {
+						const colorParse = f.color.split(",");
+						const wordsParse = f.words.split(",");
+						const newDiv = document.createElement('div');
+						newDiv.classList.add('guesses');
+						const text = `
+						<span class="circles" style="background:${colors[colorParse[3]]}"></span> <div class="words">${wordsParse[3]}</div>
+						<span class="circles" style="background:${colors[colorParse[2]]}"></span> <div class="words">${wordsParse[2]}</div>
+						<span class="circles" style="background:${colors[colorParse[1]]}"></span> <div class="words">${wordsParse[1]}</div>
+						<span class="circles" style="background:${colors[colorParse[0]]}"></span> <div class="words">${wordsParse[0]}</div>
+					`
+						newDiv.innerHTML = text;
+						document.getElementById('popup-content').appendChild(newDiv);
+					});
+
+					document.getElementById('date').innerHTML = `${uniqueLayers[latestIndex].date}`;
 				}
-				// { element, index, direction }
 			})
 			.onStepExit((response) => {
-				// console.log('index exit', response);
 				const base = response.index;
 				map.setPaintProperty(`${base}-layer`, 'fill-extrusion-opacity', 0.1);
-				if (latestIndex > response.index) {
-					// map.setLayoutProperty(`${base}-layer`, 'visibility', 'none');
-				}
-				
-				// { element, index, direction }
 			});
-		
-		// map.on('click', () => {
-			
-		// })
 
 		document.getElementById('steps').addEventListener('click', function (event) {
 			active = !active;
-			console.log('active', active);
 			const vis = active ? 'visibile' : 'none';
-			// This function will be executed when the div is clicked
-			console.log('Div clicked!', event);
-			// const arr = Array.from(Array(rows).keys());
-			// arr.forEach((i) => {
-			// 	// console.log('i', i);
-			// 	if (i != latestIndex && latestIndex > i) {
-			// 		map.setLayoutProperty(`${i}-layer`, 'visibility', vis);
-			// 	}
-			// })
 
 			if (active) {
 				map.easeTo({
 					zoom: 9,
-					center: [((latestIndex * dist)+(dist*6)), 0.3],
+					center: [((latestIndex * dist)+(dist*6)), 0.25],
 					bearing:90,
 					pitch:90
 				});
+
+				
+
+				// document.getElementById('popup-content').classList.add('fade');
+				
 			} else {
 				map.easeTo({
 					zoom: 8.5,
@@ -189,6 +235,13 @@
 					bearing: 50,
 					pitch: 40
 				});
+
+				// document.getElementById('popup').innerHTML = `
+				// 		${uniqueLayers[latestIndex].date}
+				// 		<div id="popup-content"></div>
+				// 	`;
+				
+				// document.getElementById('popup-content').classList = '';
 			}
 			// Additional actions can be performed here
 		});
@@ -253,16 +306,12 @@
 
 		const output = layer.filter((l) => {return l.date === value.date});
 
-		console.log('output arrays', output);
+		// console.log('output arrays', output);
 
 		const collection = turf.featureCollection([]);
 		[...output].forEach((feature) => {
-			// console.log('feature', feature);
 			collection.features.push(...feature.data.features);
 		})
-		
-		// console.log('object', collection);
-
 		const sourceName = `${index}-source`;
 		const layerName = `${index}-layer`;
 		map.addSource(sourceName, {
@@ -280,7 +329,7 @@
 				// https://maplibre.org/maplibre-style-spec/expressions/
 
 				// Get the fill-extrusion-color from the source 'color' property.
-				'line-color': '#555',
+				'line-color': '#9a9a9a',
 
 				// Get fill-extrusion-height from the source 'height' property.
 				'line-width': 1,
@@ -312,10 +361,10 @@
 				],
 
 				// Get fill-extrusion-height from the source 'height' property.
-				'fill-extrusion-height': ['*', ['to-number', ['get', 'guess']], height],
+				'fill-extrusion-height': ['*', ['-', 7, ['to-number', ['get', 'guess']]], height],
 
 				// Get fill-extrusion-base from the source 'base_height' property.
-				'fill-extrusion-base': ['-', ['*', ['to-number', ['get', 'guess']], height], height],
+				'fill-extrusion-base': ['-', ['*', ['-', 7, ['to-number', ['get', 'guess']]], height], height],
 
 				// Make extrusions slightly opaque for see through indoor walls.
 				'fill-extrusion-opacity': 0.1,
