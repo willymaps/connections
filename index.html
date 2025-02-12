@@ -1,90 +1,100 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>Display a map</title>
-    <meta property="og:description" content="Initialize a map in an HTML element with MapLibre GL JS." />
-    <meta charset='utf-8'>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.css' />
-    <script src='https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js'></script>
-	<script src="https://unpkg.com/d3@7.9.0/dist/d3.min.js"></script>
-	<script src="https://cdn.jsdelivr.net/npm/@turf/turf@7/turf.min.js"></script>
-	<script src="https://unpkg.com/scrollama"></script>
-    <style>
-        body { margin: 0; padding: 0; }
-        html, body { height: 100%; font-size:16px; color: #111}
-		#map {
-			pointer-events: none;
-			position:fixed;
-			width:100%;
-			height:100vh;
-			top:0;
-		}
+<title>Connections map</title>
+<meta property="og:description" content="Connections map" />
+<meta charset='utf-8'>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel='stylesheet' href='https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.css' />
+<script src='https://unpkg.com/maplibre-gl@5.1.0/dist/maplibre-gl.js'></script>
+<script src="https://unpkg.com/d3@7.9.0/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@7/turf.min.js"></script>
+<script src="https://unpkg.com/scrollama"></script>
+<style>
+	body { margin: 0; padding: 0; }
+	html, body { height: 100%; font-size:16px; color: #111}
+	#map {
+		pointer-events: none;
+		position:fixed;
+		width:100%;
+		height:100vh;
+		top:0;
+	}
 
-		#steps {
-			position: absolute;
-			z-index: 11;
-			margin: auto;
-			width:100%;
-			/* overflow: hidden; */
-		}
+	#steps {
+		position: absolute;
+		z-index: 11;
+		margin: auto;
+		width:100%;
+	}
 
-		.step {
-			height:70vh;
-			width:100%;
-		}
+	.step {
+		height:70vh;
+		width:100%;
+	}
 
-		#date {
-			font-weight: bold;
-		}
+	#date {
+		font-weight: bold;
+		margin-bottom: 3px;
+	}
 
-		#popup {
-			position: fixed;
-			padding:20px;
-			bottom:0;
-			left:0;
-			width:100%;
-			z-index:12;
-			background-color: rgba(255,255,255,0);
-			font-family: sans-serif;
-			text-align:center;
-			margin:auto;
-			pointer-events: none;
-			display: flex;
-    		flex-direction: column;
-		}
+	#popup {
+		position: fixed;
+		padding: 20px 0;
+		bottom:0;
+		left:0;
+		width:100%;
+		z-index:12;
+		background-color: rgba(255,255,255,0);
+		font-family: sans-serif;
+		text-align:center;
+		margin:auto;
+		pointer-events: none;
+		display: flex;
+		flex-direction: column;
+	}
 
-		#popup-content {
-			text-align: center;
-    		margin: auto;
-			transition: 0.5s all;
-			width:100%;
-			display: flex;
-			flex-direction: column;
-			align-content: center;
-			justify-content: center;
-			align-items: center;
-		}
+	#popup-content {
+		text-align: center;
+		margin: auto;
+		transition: 0.5s all;
+		width:100%;
+		display: flex;
+		flex-direction: column;
+		align-content: center;
+		justify-content: center;
+		align-items: center;
+	}
 
-		#popup-content.fade {
-			opacity:0.5;
-		}
+	#popup-content.fade {
+		opacity:0.5;
+	}
 
-		.circles {
-			height:12px;
-			width:12px;
-			display: inline-block;
-		}
+	.circles {
+		height:12px;
+		width:12px;
+		display: inline-block;
+	}
 
-		.guesses {
-			text-align: left;
-		}
+	.guesses {
+		text-align: left;
+	}
 
+	.words {
+		width:fit-content;
+		display: inline-block;
+	}
+
+	.maplibregl-ctrl-bottom-right {
+    	display: none;
+	}
+
+	@media (max-width: 600px) {
 		.words {
-			width:fit-content;
-			display: inline-block;
+			font-size: 0.8rem;
 		}
-    </style>
+	}
+</style>
 </head>
 <body>
 <div id="popup">
@@ -99,6 +109,8 @@
 	window.onbeforeunload = function () {
 		window.scrollTo(0, 0);
 	}
+	const width = window.innerWidth;
+
 	let active = false;
 	let layers;
 	let uniqueLayers;
@@ -157,94 +169,9 @@
 			addLayers(index, value, layers)
 		}
 	}).then(() => {
-		// instantiate the scrollama
-		const scroller = scrollama();
-
-		// setup the instance, pass callback functions
-		scroller
-			.setup({
-				step: ".step",
-			})
-			.onStepEnter((response) => {
-				active = false;
-				if (loaded) {
-					latestIndex = response.index;
-					map.easeTo({
-						zoom: 8.5,
-						center: [(latestIndex * dist), 0.2],
-						bearing: 50,
-						pitch: 40
-					});
-					const base = response.index;
-					map.setPaintProperty(`${base}-layer`, 'fill-extrusion-opacity', 0.85);
-
-					// console.log('layers', layers[response.index]);
-					map.setLayoutProperty(`${base}-layer`, 'visibility', 'visible');
-					const arr = Array.from(Array(rows).keys());
-					arr.forEach((i) => {
-						if (i != latestIndex && latestIndex > i) {
-							map.setLayoutProperty(`${i}-layer`, 'visibility', 'none');
-						}
-					})
-
-					const filtered = layers.filter((l) => { return l.date === uniqueLayers[latestIndex].date });
-					document.getElementById('popup-content').innerHTML = ``;
-					filtered.forEach((f) => {
-						const colorParse = f.color.split(",");
-						const wordsParse = f.words.split(",");
-						const newDiv = document.createElement('div');
-						newDiv.classList.add('guesses');
-						const text = `
-						<span class="circles" style="background:${colors[colorParse[3]]}"></span> <div class="words">${wordsParse[3]}</div>
-						<span class="circles" style="background:${colors[colorParse[2]]}"></span> <div class="words">${wordsParse[2]}</div>
-						<span class="circles" style="background:${colors[colorParse[1]]}"></span> <div class="words">${wordsParse[1]}</div>
-						<span class="circles" style="background:${colors[colorParse[0]]}"></span> <div class="words">${wordsParse[0]}</div>
-					`
-						newDiv.innerHTML = text;
-						document.getElementById('popup-content').appendChild(newDiv);
-					});
-
-					document.getElementById('date').innerHTML = `${uniqueLayers[latestIndex].date}`;
-				}
-			})
-			.onStepExit((response) => {
-				const base = response.index;
-				map.setPaintProperty(`${base}-layer`, 'fill-extrusion-opacity', 0.1);
-			});
-
-		document.getElementById('steps').addEventListener('click', function (event) {
-			active = !active;
-			const vis = active ? 'visibile' : 'none';
-
-			if (active) {
-				map.easeTo({
-					zoom: 9,
-					center: [((latestIndex * dist)+(dist*6)), 0.25],
-					bearing:90,
-					pitch:90
-				});
-
-				
-
-				// document.getElementById('popup-content').classList.add('fade');
-				
-			} else {
-				map.easeTo({
-					zoom: 8.5,
-					center: [(latestIndex * dist), 0.2],
-					bearing: 50,
-					pitch: 40
-				});
-
-				// document.getElementById('popup').innerHTML = `
-				// 		${uniqueLayers[latestIndex].date}
-				// 		<div id="popup-content"></div>
-				// 	`;
-				
-				// document.getElementById('popup-content').classList = '';
-			}
-			// Additional actions can be performed here
-		});
+		
+		initScroller();
+		addClick();
 
 	}).catch(function (error) {
 		// Handle any errors that occur during loading
@@ -279,14 +206,15 @@
 		const colorParse = row.color.split(",");
 		[1, 2, 3, 4].forEach((c) => {
 			const box = [
-				latestRow - (dist / 2),
+				latestRow - (dist / 6),
 				(c*dist) - (dist / 2),
-				latestRow + (dist / 2),
+				latestRow + (dist / 6),
 				(c*dist) + (dist / 2),
 			];
 			const poly = turf.bboxPolygon(box, {
 				properties: {
 					guess: row.guess,
+					date: row.date,
 					color: colorParse[c-1]
 				}
 			});
@@ -314,28 +242,47 @@
 		})
 		const sourceName = `${index}-source`;
 		const layerName = `${index}-layer`;
+		console.log('collection', collection);
 		map.addSource(sourceName, {
 			'type': 'geojson',
 			data: collection
 		});
 
 		map.addLayer({
-			'id': `${layerName}-line`,
-			'type': 'line',
+			'id': `${layerName}-fill`,
+			'type': 'fill',
 			'source': sourceName,
-			'filter': ['==', ['get', 'guess'], "1"],
+			'filter': false,
 			'paint': {
 				// See the MapLibre Style Specification for details on data expressions.
 				// https://maplibre.org/maplibre-style-spec/expressions/
 
 				// Get the fill-extrusion-color from the source 'color' property.
-				'line-color': '#9a9a9a',
+				'fill-color': '#9a9a9a',
 
 				// Get fill-extrusion-height from the source 'height' property.
-				'line-width': 1,
-				'line-opacity': 0.08
+				'fill-opacity': 0.05,
+				'fill-outline-color': 'rgba(255,255,255,0)'
 			}
 		});
+
+		// map.addLayer({
+		// 	'id': `${layerName}-line`,
+		// 	'type': 'line',
+		// 	'source': sourceName,
+		// 	'filter': ['==', ['get', 'guess'], "1"],
+		// 	'paint': {
+		// 		// See the MapLibre Style Specification for details on data expressions.
+		// 		// https://maplibre.org/maplibre-style-spec/expressions/
+
+		// 		// Get the fill-extrusion-color from the source 'color' property.
+		// 		'line-color': '#9a9a9a',
+
+		// 		// Get fill-extrusion-height from the source 'height' property.
+		// 		'line-width': 1,
+		// 		'line-opacity': 0.08
+		// 	}
+		// });
 
 		map.addLayer({
 			'id': layerName,
@@ -373,6 +320,97 @@
 					delay: 0,
 					duration: 500
 				}
+			}
+		});
+	}
+
+
+	function initScroller() {
+		// instantiate the scrollama
+		const scroller = scrollama();
+
+		// setup the instance, pass callback functions
+		scroller
+			.setup({
+				step: ".step",
+			})
+			.onStepEnter((response) => {
+				// active = false;
+				if (loaded) {
+					latestIndex = response.index;
+					if (active) {
+						map.easeTo({
+							zoom: width < 600 ? 8 : 9,
+							center: [((latestIndex * dist) + (dist * 6)), 0.25],
+							bearing: 90,
+							pitch: 90
+						});
+					} else {
+						map.easeTo({
+							zoom: width < 600 ? 7.5 : 8.5,
+							center: [(latestIndex * dist), 0.2],
+							bearing: 50,
+							pitch: 40
+						});
+					}
+					const base = response.index;
+					map.setPaintProperty(`${base}-layer`, 'fill-extrusion-opacity', 0.85);
+
+					// console.log('layers', layers[response.index]);
+					map.setLayoutProperty(`${base}-layer`, 'visibility', 'visible');
+					console.log('uniqueLayers[latestIndex].date', uniqueLayers[latestIndex].date);
+					map.setFilter(`${base}-layer-fill`, ['==', ['get', 'date'], uniqueLayers[latestIndex].date]);
+					const arr = Array.from(Array(rows).keys());
+					arr.forEach((i) => {
+						if (i != latestIndex && latestIndex > i) {
+							map.setLayoutProperty(`${i}-layer`, 'visibility', 'none');
+						}
+					})
+
+					const filtered = layers.filter((l) => { return l.date === uniqueLayers[latestIndex].date });
+					document.getElementById('popup-content').innerHTML = ``;
+					filtered.forEach((f) => {
+						const colorParse = f.color.split(",");
+						const wordsParse = f.words.split(",");
+						const newDiv = document.createElement('div');
+						newDiv.classList.add('guesses');
+						const text = `
+						<span class="circles" style="background:${colors[colorParse[3]]}"></span> <div class="words">${wordsParse[3]}</div>
+						<span class="circles" style="background:${colors[colorParse[2]]}"></span> <div class="words">${wordsParse[2]}</div>
+						<span class="circles" style="background:${colors[colorParse[1]]}"></span> <div class="words">${wordsParse[1]}</div>
+						<span class="circles" style="background:${colors[colorParse[0]]}"></span> <div class="words">${wordsParse[0]}</div>
+					`
+						newDiv.innerHTML = text;
+						document.getElementById('popup-content').appendChild(newDiv);
+					});
+
+					document.getElementById('date').innerHTML = `${uniqueLayers[latestIndex].date}`;
+				}
+			})
+			.onStepExit((response) => {
+				const base = response.index;
+				map.setPaintProperty(`${base}-layer`, 'fill-extrusion-opacity', 0.1);
+				map.setFilter(`${base}-layer-fill`, false);
+			});
+	}
+
+	function addClick() {
+		document.getElementById('steps').addEventListener('click', () => {
+			active = !active;
+			if (active) {
+				map.easeTo({
+					zoom: width < 600 ? 8 : 9,
+					center: [((latestIndex * dist) + (dist * 6)), 0.25],
+					bearing: 90,
+					pitch: 90
+				});
+			} else {
+				map.easeTo({
+					zoom: width < 600 ? 7.5 : 8.5,
+					center: [(latestIndex * dist), 0.2],
+					bearing: 50,
+					pitch: 40
+				});
 			}
 		});
 	}
