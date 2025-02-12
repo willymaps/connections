@@ -41,8 +41,9 @@
 	#popup {
 		position: fixed;
 		padding: 20px 0;
-		bottom:0;
-		left:0;
+		left: 50%;
+		top:50%;
+    	transform: translate(-50%, 0);
 		width:100%;
 		z-index:12;
 		background-color: rgba(255,255,255,0);
@@ -232,7 +233,6 @@
 		})
 		const sourceName = `${index}-source`;
 		const layerName = `${index}-layer`;
-		console.log('collection', collection);
 		map.addSource(sourceName, {
 			'type': 'geojson',
 			data: collection
@@ -326,10 +326,7 @@
 					}
 					const base = response.index;
 					map.setPaintProperty(`${base}-layer`, 'fill-extrusion-opacity', 0.85);
-
-					// console.log('layers', layers[response.index]);
 					map.setLayoutProperty(`${base}-layer`, 'visibility', 'visible');
-					console.log('uniqueLayers[latestIndex].date', uniqueLayers[latestIndex].date);
 					map.setFilter(`${base}-layer-fill`, ['==', ['get', 'date'], uniqueLayers[latestIndex].date]);
 					const arr = Array.from(Array(rows).keys());
 					arr.forEach((i) => {
