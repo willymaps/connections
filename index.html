@@ -224,17 +224,7 @@
 	}
 
 	function addLayers(index, value, layer) {
-		// const colorParse = layer.color.split(",");
-		// const wordsParse = layer.words.split(",");
-
-
-		// console.log('index', index);
-		// console.log('value', value);
-		// console.log('layer', layer);
-
 		const output = layer.filter((l) => {return l.date === value.date});
-
-		// console.log('output arrays', output);
 
 		const collection = turf.featureCollection([]);
 		[...output].forEach((feature) => {
@@ -265,24 +255,6 @@
 				'fill-outline-color': 'rgba(255,255,255,0)'
 			}
 		});
-
-		// map.addLayer({
-		// 	'id': `${layerName}-line`,
-		// 	'type': 'line',
-		// 	'source': sourceName,
-		// 	'filter': ['==', ['get', 'guess'], "1"],
-		// 	'paint': {
-		// 		// See the MapLibre Style Specification for details on data expressions.
-		// 		// https://maplibre.org/maplibre-style-spec/expressions/
-
-		// 		// Get the fill-extrusion-color from the source 'color' property.
-		// 		'line-color': '#9a9a9a',
-
-		// 		// Get fill-extrusion-height from the source 'height' property.
-		// 		'line-width': 1,
-		// 		'line-opacity': 0.08
-		// 	}
-		// });
 
 		map.addLayer({
 			'id': layerName,
@@ -335,7 +307,6 @@
 				step: ".step",
 			})
 			.onStepEnter((response) => {
-				// active = false;
 				if (loaded) {
 					latestIndex = response.index;
 					if (active) {
